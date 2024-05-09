@@ -5,7 +5,7 @@ var gameboyTileMapFormat = {
 		var file = new TextFile(fileName, TextFile.WriteOnly);
 		for (var i = 0; i < map.layerCount; ++i) {
 			var layer = map.layerAt(i);
-			if (layer.isTileLayer) {
+			if (layer.isTileLayer && layer.name == "Map") {
 				for (y = 0; y < layer.height; ++y) {
 					var row = [];
 					for (x = 0; x < layer.width; ++x) {
