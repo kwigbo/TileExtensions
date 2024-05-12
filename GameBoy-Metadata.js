@@ -1,4 +1,5 @@
 const walkable = 0b00000001;
+const story = 0b00000010;
 
 var gameboyMetadataFormat = {
 	name: "Gameboy Metadata Format",
@@ -17,6 +18,12 @@ var gameboyMetadataFormat = {
 						// Less than zero is walkable. All set tiles are not.
 						if (tileId < 0) {
 							metadata = metadata | walkable
+						}
+					}
+					if (layer.name == "Story") {
+						// Less than zero is walkable. All set tiles are not.
+						if (tileId < 0) {
+							metadata = metadata | story
 						}
 					}
 				}
