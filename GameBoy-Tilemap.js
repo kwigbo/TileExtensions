@@ -1,12 +1,17 @@
+const walkable = 0b00000001;
+const ladder = 0b00000010;
+
 var gameboyTileMapFormat = {
 	name: "Gameboy Map Format",
 	extension: "tilemap",
 	write: function (map, fileName) {
 		writeTileMap(map, fileName);
 		fileName = fileName.replace(".tilemap", ".metadata");
-		writeMetadataMap(map, fileName);
+		let portalMap = writeMetadataMap(map, fileName);
 		fileName = fileName.replace(".metadata", ".search");
 		writeSearchMap(map, fileName);
+		fileName = fileName.replace(".search", ".portal");
+		writePortalMap(map, fileName, portalMap);
 	},
 };
 
@@ -41,21 +46,22 @@ function writeTileMap(map, fileName) {
 	file.commit();
 }
 
-const walkable = 0b00000001;
-const ladder = 0b00000010;
 function writeMetadataMap(map, fileName) {
 	var file = new TextFile(fileName, TextFile.WriteOnly);
+	// file.writeLine("mapSize: width: " + map.width + " height: " + map.height);
 	let total = map.width * map.height;
 	let objectLayer = new Array(total);
 	objectLayer.fill(0);
-	let columnTotal = map.width/8;
+	let portalLayer = new Array(total);
+	portalLayer.fill(0);
+	let columnTotal = map.width;
 	// file.writeLine("columnTotal: " + columnTotal);
 	for (var i = 0; i < map.layerCount; ++i) {
 		var layer = map.layerAt(i);
 		if (layer.name == "MetaData") {
 			for (let key in layer.objects) {
 				let object = layer.objects[key];
-				let data = object.property("data");
+				let data = object.property("portalId");
 				if (data.length > 0) {
 					let objectX = object.x;
 					// Subtract 8 since the coordinate is on the bottom of the object
@@ -65,7 +71,8 @@ function writeMetadataMap(map, fileName) {
 					let realIndex = row * columnTotal + column;
 					// file.writeLine("Adding Object - column: " + column + " / row: " + row);
 					// file.writeLine("Object Data: " + data);
-					objectLayer[realIndex] = data;
+					objectLayer[realIndex] = 1;
+					portalLayer[realIndex] = data
 				}
 			}
 		}
@@ -99,13 +106,16 @@ function writeMetadataMap(map, fileName) {
 			let realIndex = y * columnTotal + x;
 			var objectData = objectLayer[realIndex];
 			objectData = parseInt(objectData, 2);
-			
+			objectData = objectData.toString(16);
+			// row.push("$" + realIndex);
+			// row.push("$" + objectData);
 			row.push("$" + objectData + metadata.toString(16));
 		}
 		var rowString = row.join(",").toString();
 		file.writeLine("db " + rowString);
 	}
 	file.commit();
+	return portalLayer
 }
 
 function writeSearchMap(map, fileName) {
@@ -127,6 +137,22 @@ function writeSearchMap(map, fileName) {
 					row.push("$" + tileId.toString(16));
 				}
 			}
+		}
+		var rowString = row.join(",").toString();
+		file.writeLine("db " + rowString);
+	}
+	file.commit();
+}
+
+function writePortalMap(map, fileName, portalMap) {
+	var file = new TextFile(fileName, TextFile.WriteOnly);
+	let columnTotal = map.width;
+	for (y = 0; y < map.height; ++y) {
+		var row = [];
+		for (x = 0; x < map.width; ++x) {
+			let realIndex = y * columnTotal + x;
+			var objectData = parseInt(portalMap[realIndex]);
+			row.push("$" + objectData.toString(16));
 		}
 		var rowString = row.join(",").toString();
 		file.writeLine("db " + rowString);
