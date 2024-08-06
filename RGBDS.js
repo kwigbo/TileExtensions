@@ -6,9 +6,8 @@ var RGBDSFormat = {
         let mapName = getMapName(fileName);
         writeHeader(map, file, mapName);
         writeTileMap(map, file, mapName);
-        let portalMap = writeMetaData(map, file, mapName);
-        writePortalData(map, file, mapName, portalMap);
-        writeSearchData(map, file, mapName);
+        writeMetaData(map, file, mapName);
+        writeObjectData(map, file, mapName);
         file.commit();
 	},
 };
@@ -77,6 +76,7 @@ function writeTileMap(map, file, mapName) {
 
 /*
 * Function used to generate the meta data map
+* Meta data includes walkable and ladder values for tiles
 *
 * @param map: The map object to generate from
 * @param file: The file to write to
@@ -86,36 +86,6 @@ function writeMetaData(map, file, mapName) {
     let startKey = mapName + "Meta"
     file.writeLine("export " + startKey);
     file.writeLine(startKey + ":");
-    let total = map.width * map.height;
-	let objectLayer = new Array(total);
-	objectLayer.fill(0);
-	let portalLayer = new Array(total);
-	portalLayer.fill(0);
-	let columnTotal = map.width;
-	// file.writeLine("columnTotal: " + columnTotal);
-	for (var i = 0; i < map.layerCount; ++i) {
-		var layer = map.layerAt(i);
-		if (layer.name == "MetaData") {
-			for (let key in layer.objects) {
-				let object = layer.objects[key];
-				let data = object.property("portalId");
-				if (data.length > 0) {
-					let objectX = object.x;
-					// Subtract 8 since the coordinate is on the bottom of the object
-					let objectY = object.y - 8;
-					let column = objectX/8;
-					let row = objectY/8;
-					let realIndex = row * columnTotal + column;
-					// file.writeLine("Adding Object - column: " + column + " / row: " + row);
-					// file.writeLine("Object Data: " + data);
-					objectLayer[realIndex] = 1;
-					portalLayer[realIndex] = data
-				}
-			}
-		}
-	}
-
-	// file.writeLine("Object Layer: " + objectLayer);
 	for (y = 0; y < map.height; ++y) {
 		var row = [];
 		for (x = 0; x < map.width; ++x) {
@@ -140,77 +110,67 @@ function writeMetaData(map, file, mapName) {
 					}
 				}
 			}
-			let realIndex = y * columnTotal + x;
-			var objectData = objectLayer[realIndex];
-			objectData = parseInt(objectData, 2);
-			objectData = objectData.toString(16);
-			// row.push("$" + realIndex);
-			// row.push("$" + objectData);
-			row.push("$" + objectData + metadata.toString(16));
-		}
-		var rowString = row.join(",").toString();
-		file.writeLine("db " + rowString);
-	}
-    return portalLayer
-}
-
-/*
-* Function used to generate the meta data map
-*
-* @param map: The map object to generate from
-* @param file: The file to write to
-* @param mapName: The name of the map being generated
-* @param portalMap: The map of portals in the map
-*/
-function writePortalData(map, file, mapName, portalMap) {
-    let startKey = mapName + "Portal"
-    file.writeLine("export " + startKey);
-    file.writeLine(startKey + ":");
-    let columnTotal = map.width;
-	for (y = 0; y < map.height; ++y) {
-		var row = [];
-		for (x = 0; x < map.width; ++x) {
-			let realIndex = y * columnTotal + x;
-			var objectData = parseInt(portalMap[realIndex]);
-			row.push("$" + objectData.toString(16));
+			row.push("$" + metadata.toString(16));
 		}
 		var rowString = row.join(",").toString();
 		file.writeLine("db " + rowString);
 	}
 }
-
 /*
-* Function used to generate the search data map
+* Function used to generate the object map
 *
 * @param map: The map object to generate from
 * @param file: The file to write to
 * @param mapName: The name of the map being generated
 */
-function writeSearchData(map, file, mapName) {
-    let startKey = mapName + "Search"
+function writeObjectData(map, file, mapName) {
+    let startKey = mapName + "Object"
     file.writeLine("export " + startKey);
     file.writeLine(startKey + ":");
-    for (y = 0; y < map.height; ++y) {
-		var row = [];
-		for (x = 0; x < map.width; ++x) {
-			for (var i = 0; i < map.layerCount; ++i) {
-				var layer = map.layerAt(i);
-				if (!layer.isTileLayer) {
-					continue;
+
+    let total = map.width * map.height;
+	let portalLayer = new Array(total);
+	portalLayer.fill("");
+    let searchLayer = new Array(total);
+	searchLayer.fill("");
+
+	let columnTotal = map.width;
+	for (var i = 0; i < map.layerCount; ++i) {
+		var layer = map.layerAt(i);
+		if (layer.name == "Objects") {
+			for (let key in layer.objects) {
+				let object = layer.objects[key];
+                let column = object.x/8;
+                let row = (object.y - 8)/8;
+                let realIndex = row * columnTotal + column;
+				let portalId = object.property("portalId");
+                if (stringIsValid(portalId)) {
+					portalLayer[realIndex] = portalId;
 				}
-				var tile = layer.tileAt(x, y);
-				var cell = layer.cellAt(x, y);
-				// Add 1 so empty tiles are a 0
-				var tileId = cell.tileId + 1;
-				if (layer.name == "Search") {
-					tileId = tileId;
-					row.push("$" + tileId.toString(16));
+                let searchId = object.property("searchId");
+				if (stringIsValid(searchId)) {
+					searchLayer[realIndex] = searchId;
 				}
 			}
 		}
-		var rowString = row.join(",").toString();
-		file.writeLine("db " + rowString);
 	}
+    for (y = 0; y < map.height; ++y) {
+		var row = [];
+		for (x = 0; x < map.width; ++x) {
+            let realIndex = y * columnTotal + x;
+			var portalData = portalLayer[realIndex];
+            var searchData = searchLayer[realIndex];
+            if (stringIsValid(portalData)) {
+                row.push("$2" + portalData);
+            } else if (stringIsValid(searchData)) {
+                row.push("$1" + searchData);
+            } else {
+                row.push("$00");
+            }
+        }
+        var rowString = row.join(",").toString();
+		file.writeLine("db " + rowString);
+    }
 }
 
 // MARK: Utility Methods
@@ -235,7 +195,8 @@ function getMapName(filePath) {
 function stringIsValid(str) {
     if ((typeof str === "string" && 
         str.trim().length === 0) || 
-        str === null) {
+        str === null || 
+        str === undefined) {
         return false
       }
       return true
