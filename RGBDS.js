@@ -16,6 +16,7 @@ tiled.registerMapFormat("asm", RGBDSFormat);
 
 const walkable = 0b00000001;
 const ladder = 0b00000010;
+const cloud = 0b00000100;
 
 /*
 * Function used to generate the ROMX section that will 
@@ -104,9 +105,15 @@ function writeMetaData(map, file, mapName) {
 					}
 				}
 				if (layer.name == "Ladder") {
-					// Greater than 0 has ladder
+					// Greater than -1 has ladder
 					if (tileId == 0) {
 						metadata = ladder;
+					}
+				}
+				if (layer.name == "Cloud") {
+					// Greater than -1 has cloud
+					if (tileId == 0) {
+						metadata = cloud;
 					}
 				}
 			}
